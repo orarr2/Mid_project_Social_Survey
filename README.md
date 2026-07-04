@@ -95,3 +95,4 @@ README.md                     This file
 ## Data source
 
 Israeli Central Bureau of Statistics, Social Survey 2024, Public Use File.
+
