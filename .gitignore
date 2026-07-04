@@ -4,6 +4,9 @@ data/
 *.parquet
 *.csv
 
+# ... except the team plan
+!pipeline.xlsx
+
 # Python
 __pycache__/
 *.pyc
