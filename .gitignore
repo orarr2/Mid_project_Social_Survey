@@ -1,0 +1,26 @@
+# Never commit the survey data
+data/
+*.xlsx
+*.parquet
+*.csv
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+_run.ipynb
+_executed.ipynb
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local scratch
+scratchpad/

@@ -1,0 +1,11 @@
+numpy
+pandas
+plotly
+openpyxl
+folium
+wordcloud
+Pillow
+matplotlib
+pyarrow
+jupyter
+nbformat
