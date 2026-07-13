@@ -1,22 +1,24 @@
-# מדריך תא-אחר-תא של המחברת המאוחדת - חלק Or (הדאשבורד)
+# מדריך תא-אחר-תא של המחברת המאוחדת — חלק Or (הדאשבורד)
 
-מסמך הסבר לפגישת הזום. עובר על **החלק שלי בלבד** במחברת המאוחדת `eda_model_dashboard.ipynb` - כלומר Part 3 - Interactive Dashboard, ומסביר מה כל תא עושה, למה, ומה חשוב לומר עליו כדי שלא ייחשב לקופסה שחורה.
+מסמך טכני המתאר את החלק של Or במחברת `eda_model_dashboard.ipynb` — Part 3 - Interactive Dashboard. כל תא במסמך מלווה בהסבר תמציתי, בקטעי קוד רלוונטיים ובנקודות טכניות מרכזיות. המסמך אינו מכסה את תאי Part 1 (שי) ו-Part 2 (עובד); הם נדונים רק בהקשר של תלויות בזרימת הדאטה.
 
-המחברת המאוחדת מורכבת מ-3 חלקים: Part 1 (שי - EDA וניקוי), Part 2 (עובד - מודל GMM+XGBoost), **Part 3 (אני - דאשבורד)**. המסמך הזה מתחיל בתא הראשון של Part 3 - כל מה שרץ לפניו הוא הכנת דאטה על ידי שי ואימון מודל על ידי עובד, והתוצרים שלהם עוברים אליי בשני אופנים במקביל: (1) משתני זיכרון גלובליים (`model_data`, `features`, `saved_figures`, `codebook`, `structure_summary`, `eda_groups`, `cv_results`) שקיימים אחרי Restart & Run All, וגם (2) קבצי handoff על הדיסק (`model data.csv`, `xgb_model.pkl`, `shai_state.pkl`, `ovad_state.pkl`) - כדי שאפשר יהיה להריץ רק את Part 3 בסשן חדש, למשל ב-Google Colab, בלי לחזור על שי ועובד.
+המחברת המאוחדת מורכבת משלושה חלקים ברצף: Part 1 (שי — EDA וניקוי), Part 2 (עובד — מודל GMM+XGBoost), Part 3 (Or — דאשבורד). Part 3 מסתמך על תוצרים של הקודמים בשני מסלולים מקבילים:
 
-Part 3 שלי בנוי מ-**11 תאי קוד** ועוד כמה תאי markdown של כותרות. הזרימה: טעינה של תוצרי החלקים הקודמים -> בניית 3 גרפי Plotly (Young Generation) + ענן מילים + מפת Folium -> הרכבת HTML לכל טאב -> כתיבה של `index.html` יחיד -> הרמת שרת מקומי שפותח אותו בדפדפן (או Colab download).
+1. **בזיכרון:** משתנים גלובליים כמו `raw`, `structure_summary`, `data_dictionary`, `eda_groups`, `codebook`, `model_data`, `features`, `cv_results`, `saved_figures` — קיימים לאחר Restart & Run All של המחברת.
+2. **בקבצי handoff על הדיסק:** `model data.csv`, `xgb_model.pkl`, `shai_state.pkl`, `ovad_state.pkl` — מאפשרים הרצה של Part 3 בלבד בסשן חדש, למשל ב-Google Colab.
+
+Part 3 בנוי מ-11 תאי קוד ותאי markdown של כותרות. הזרימה בו: טעינת תוצרים מהחלקים הקודמים -> בניית שני גרפי Plotly (Young Generation) + ענן מילים + מפת Folium -> הרכבת HTML לכל טאב -> כתיבה של `index.html` יחיד -> הרמת שרת מקומי שפותח את הקובץ בדפדפן, או הורדה אוטומטית ב-Colab.
 
 ---
 
-## תא 1 - קוד - Handoff מ-Part 2: טעינת המודל + Colab bridge
+## תא 1 — קוד — Handoff מ-Part 2: טעינת המודל + Colab bridge
 
-**מה זה עושה:** התא הראשון של Part 3 שלי. שני דברים במקביל:
+**מה התא עושה:** התא הראשון של Part 3. שני תפקידים משולבים בו:
 
-1. **בדיקה אם צריך "לשחזר" את מצב הזיכרון של Parts 1+2:** במצב Restart & Run All כל המשתנים כבר קיימים בזיכרון ולא צריך לעשות דבר. אבל במצב Part-3-only (סשן חדש, למשל Colab שקרס באמצע) הזיכרון ריק - במקרה כזה קוראים את קבצי ה-pickle שנשמרו בסוף שי ובסוף עובד, ופורקים אותם ל-`globals()`.
-
+1. **בדיקה האם דרוש שחזור של מצב הזיכרון של Parts 1 ו-2.** במצב Restart & Run All כל המשתנים כבר קיימים בזיכרון; במצב Part-3-only, למשל בסביבת Colab לאחר קריסת סשן, הזיכרון ריק. במקרה כזה התא קורא את קבצי ה-pickle שנשמרו בסוף Part 1 ובסוף Part 2, ומזריק את תוכנם ל-`globals()`.
 2. **טעינת המודל המאומן:** `model = joblib.load("xgb_model.pkl")`.
 
-**קטעי קוד מרכזיים:**
+**קטע קוד מרכזי:**
 
 ```python
 _stale = any(_need(v) for v in
@@ -27,7 +29,7 @@ if _stale:
     _missing = [f for f in _PART3_REQUIRED if not os.path.exists(f)]
     if _missing and IN_COLAB:
         from google.colab import files
-        _uploaded = files.upload()   # מבקש מהמשתמש להעלות pkl-ים
+        _uploaded = files.upload()   # דיאלוג העלאה של קבצי pkl
     ...
     _shai_state = joblib.load("shai_state.pkl")
     _ovad_state = joblib.load("ovad_state.pkl")
@@ -37,17 +39,17 @@ if _stale:
 model = joblib.load("xgb_model.pkl")
 ```
 
-**דגשים חשובים לפגישה:**
+**נקודות טכניות:**
 
-- **`globals().update(...)` הוא הטריק:** dict נטען מ-pickle מכיל את השמות המקוריים של המשתנים, וההזרקה ישירות ל-`globals()` הופכת אותם למשתנים גלובליים במחברת - כאילו Parts 1+2 באמת רצו. זו הטכניקה שמאפשרת "לזייף" את המצב אחרי הפעלה חדשה.
-- **`IN_COLAB`** הוגדר עוד בתא ה-imports הראשון של המחברת המלאה (בראש - לפני החלקים) על ידי `try/except google.colab`. אני מסתמך עליו כאן, לא מגלה את הפלטפורמה מחדש.
-- **הבחירה של joblib ולא pickle רגיל** נחוצה כי `saved_figures` הוא dict של אובייקטי `matplotlib.figure.Figure` - joblib מסתדר איתם טוב יותר.
+- **`globals().update(...)` הוא המנגנון המרכזי:** dict שנטען מ-pickle מכיל את השמות המקוריים של המשתנים, וההזרקה שלו ל-`globals()` הופכת אותם למשתנים גלובליים במחברת — כאילו Parts 1 ו-2 באמת רצו. זה מה שמאפשר שחזור מלא לאחר סשן חדש.
+- **`IN_COLAB`** מוגדר בתא ה-imports הראשון של המחברת המלאה (בראש, לפני החלוקה לחלקים) באמצעות `try/except google.colab`. Part 3 מסתמך על המשתנה הזה ואינו מגלה את הפלטפורמה מחדש.
+- **הבחירה ב-`joblib` ולא ב-`pickle` רגיל** נדרשת מפני ש-`saved_figures` הוא dict של אובייקטי `matplotlib.figure.Figure`. joblib מתמודד עם אובייקטים כאלה בצורה יציבה יותר.
 
 ---
 
-## תא 2 - קוד - בדיקת סביבה + imports של Part 3
+## תא 2 — קוד — בדיקת סביבה + imports של Part 3
 
-**מה זה עושה:** בדיקה חוזרת שהחבילות שהחלק שלי צריך זמינות (`plotly`, `folium`, `wordcloud`, `PIL`, `openpyxl`, `matplotlib`) ומייבא אותן. יש כאן חפיפה מסוימת עם תא ה-imports הכללי בראש המחברת - התא הזה קיים כדי שכשמריצים רק את Part 3 מתחילתו הוא יעבוד גם אם תא ה-imports הכללי לא רץ.
+**מה התא עושה:** בודק שהחבילות שנחוצות ל-Part 3 (`plotly`, `folium`, `wordcloud`, `PIL`, `openpyxl`, `matplotlib`) קיימות בסביבה, ומייבא אותן. יש חפיפה מסוימת עם תא ה-imports הכללי בראש המחברת; התא הזה קיים כדי להבטיח שאם מריצים רק את Part 3 מתחילתו, החבילות ייבדקו ויתייבאו גם אז.
 
 **קטע קוד מרכזי:**
 
@@ -57,25 +59,33 @@ REQUIRED = ["numpy", "pandas", "plotly", "openpyxl", "folium", "wordcloud",
 OPTIONAL = ["pyarrow"]
 ```
 
-**דגש חשוב:** `plotly` הוא המנוע של הגרפים האינטראקטיביים, `folium` בונה את המפה, `wordcloud` יוצר את ענן המילים, `PIL` נדרש ל-`wordcloud` בסביבתו, `pyarrow` אופציונלי - רק אם רוצים cache מהיר של הדאטה בפורמט parquet במקום לקרוא את ה-Excel כל פעם מחדש.
+**נקודות טכניות:**
+
+- `plotly` — מנוע הגרפים האינטראקטיביים.
+- `folium` — בונה את המפה של תת-מחוזות (Nafa).
+- `wordcloud` — יוצר את ענן המילים.
+- `PIL` — נדרש על ידי `wordcloud` לעיבוד תמונה.
+- `pyarrow` — אופציונלי, לשמירה וטעינה של הדאטה בפורמט parquet במקום קריאת ה-Excel כל פעם מחדש.
 
 ---
 
-## תא 3 - קוד - טעינת דאטה + מיפויי קודים + קואורדינטות תת-מחוזות
+## תא 3 — קוד — טעינת דאטה + מיפויי קודים + קואורדינטות תת-מחוזות
 
-**מה זה עושה:** שלושה דברים:
+**מה התא עושה:** שלוש פעולות:
 
-1. **טעינת הדאטה** מקובץ `data_24.xlsx`. ריצה ראשונה קוראת את ה-Excel (איטי, כ-דקה) וכותבת `data_24_cache.parquet`. כל ריצה הבאה טוענת מה-parquet תוך פחות משנייה.
-2. **הגדרת מילוני קידוד -> תווית:** `AGE_LABELS`, `INCOME_LABELS`, `SAT_LABELS`, `LEFTOVER_LABELS`, `OPTIMISM_LABELS`.
-3. **הגדרת `NAFA`** - 16 קודי תת-מחוזות של הלמ"ס עם קואורדינטות (lat, lon). זה מה שמזין את מפת Folium בטאב Geography.
+1. **טעינת הדאטה** מקובץ `data_24.xlsx`. הרצה ראשונה קוראת את ה-Excel (איטי, כדקה) וכותבת cache בפורמט parquet לקובץ `data_24_cache.parquet`. הרצות עוקבות טוענות מ-parquet בפחות משנייה.
+2. **הגדרת מילוני קידוד -> תווית לגרפים:** `AGE_LABELS`, `INCOME_LABELS`, `SAT_LABELS`, `LEFTOVER_LABELS`, `OPTIMISM_LABELS`.
+3. **הגדרת `NAFA`** — 16 קודי תת-מחוזות של הלמ"ס עם קואורדינטות (lat, lon). המילון הזה מזין את מפת ה-Folium בטאב Geography.
 
-**דגש חשוב:** המילונים משמשים **רק לתוויות ציר בגרפים**. הערך הגולמי בדאטה נשאר `1` או `2` או `888888` - הוא לא מוחלף. שי מטפל בהחלפת הקודים ל-NaN בחלק שלו על המחברת - אני משאיר את הדאטה כמו שהוא בקוד של אור כדי לא לחדור לתחום שלו.
+**נקודות טכניות:**
+
+- המילונים משמשים אך ורק לתוויות ציר. הערך הגולמי בדאטה נשאר `1`, `2` או `888888` — לא מוחלף בזיכרון. הטיפול בקודים השמורים מתבצע ב-Part 1 של שי; Part 3 שומר על הדאטה כפי שהוא כדי לא לחדור לתחום שלו.
 
 ---
 
-## תא 4 - קוד - הגדרת השאלון הפיננסי (10 שאלות)
+## תא 4 — קוד — הגדרת השאלון הפיננסי (10 שאלות)
 
-**מה זה עושה:** מגדיר את השאלון בתור מבנה נתונים בשם `QUIZ` - list of dicts. יש **5 שאלות ידע** (`kind: "knowledge"` עם שדה `correct`) ו-**5 שאלות התנהגות** (`kind: "behavior"` עם שדה `survey_var` שמצביע על משתנה בסקר, ו-`popYes` שנוצר בזמן טעינת המחברת).
+**מה התא עושה:** מגדיר את השאלון כרשימה של dictionaries בשם `QUIZ`. במבנה הנתונים יש חמש שאלות ידע (`kind: "knowledge"` עם שדה `correct`) וחמש שאלות התנהגות (`kind: "behavior"` עם שדה `survey_var` המצביע על משתנה בסקר, ועם שדה `popYes` שמחושב בזמן טעינת המחברת).
 
 **קטע קוד מרכזי:**
 
@@ -92,30 +102,30 @@ QUIZ = [
     ...
 ]
 
-# popYes נבנה מהדאטה עצמו - לא ערך קשיח:
+# popYes מחושב מהדאטה הגולמי — לא ערך קשיח:
 for q in QUIZ:
     if q.get("kind") == "behavior":
         col = q["survey_var"]
         q["popYes"] = float(((df[col] == q["yes_code"]).sum() / len(df)) * 100)
 ```
 
-**דגשים חשובים לפגישה:**
+**נקודות טכניות:**
 
-- **המשמעות של החלוקה 5+5:** שאלות הידע מייצרות את **ציון המשתמש** (Gauge חצי-עגול בטאב Your Profile), שאלות ההתנהגות מייצרות את **גרף ההשוואה** (מה אחוז ה"כן" של המשתמש מול 6,907 המשיבים).
-- **`popYes` נחשב בזמן טעינת המחברת פעם אחת**. הוא נכתב לתוך HTML כחלק מ-`QUIZ` JSON. בדפדפן זו כבר סתם קריאה מטבלה - אין קריאת רשת, אין פייתון בסביבת ה-runtime.
-- **חמש שאלות ההתנהגות ממופות ישירות למשתני הסקר** - `HisachonPensyoni`, `HatavaKHishtalmut_wp`, `InternetShilemMatbeaDig`, `HashkaotBank`, `InternetDohPensia`. כשמדברים על הדאשבורד בפגישה: זו נקודת ההשוואה 1:1 של המשתמש מול המדגם.
-- **המבנה של `QUIZ` הוא JSON serializable במלואו**, וזה חשוב כי בהמשך אני מכניס אותו לתוך `HTML_TEMPLATE` דרך `json.dumps` (בתא 10).
+- **החלוקה 5 + 5 היא מהותית:** שאלות הידע מייצרות את הציון של המשתמש (מוצג ב-Gauge חצי-עגול בטאב Your Profile), ושאלות ההתנהגות מייצרות את גרף ההשוואה (מה אחוז ה"כן" של המשתמש מול 6,907 המשיבים בסקר).
+- **`popYes` מחושב פעם אחת בזמן טעינת המחברת** ונכתב ל-HTML כחלק ממערך `QUIZ` בפורמט JSON. בדפדפן זו כבר קריאה מטבלה, בלי קריאה לרשת ובלי פייתון בזמן ריצה.
+- **חמש שאלות ההתנהגות ממופות ישירות למשתני הסקר:** `HisachonPensyoni`, `HatavaKHishtalmut_wp`, `InternetShilemMatbeaDig`, `HashkaotBank`, `InternetDohPensia`. זו נקודת ההשוואה 1:1 של המשתמש מול המדגם.
+- **המבנה של `QUIZ` הוא JSON serializable במלואו.** בהמשך הוא מוכנס לתוך `HTML_TEMPLATE` דרך `json.dumps` (בתא 10).
 
 ---
 
-## תא 5 - קוד - Helpers משותפים (`FIGS`, `_clean`, `register`, `age_order`)
+## תא 5 — קוד — Helpers משותפים (`FIGS`, `_clean`, `register`, `age_order`)
 
-**מה זה עושה:** מגדיר את התשתית המשותפת של גרפי Plotly. אחרי המיזוג עם שי ועובד, נשארו בי רק 2 גרפי Plotly (Young Generation) - שאר הגרפים הוסרו כי הטאבים שלהם הוחלפו בטאבים חדשים שמציגים תוצרים של שי ועובד. עדיין נחוצים ה-helpers כי הגרפים הנותרים משתמשים בהם.
+**מה התא עושה:** מגדיר את התשתית המשותפת לגרפי Plotly ב-Part 3. לאחר המיזוג עם החלקים של שי ועובד, נותרו רק שני גרפי Plotly בחלק של Or (בטאב Young Generation); שאר הגרפים הוסרו מפני שהטאבים שלהם הוחלפו בטאבים חדשים המציגים תוצרים של Parts 1 ו-2. עם זאת, ה-helpers עדיין נחוצים לגרפים שנותרו.
 
 **קטעי קוד מרכזיים:**
 
 ```python
-FIGS = {}                     # dict מרכזי - המפה של key -> Plotly Figure
+FIGS = {}                     # dict מרכזי - מיפוי key -> Plotly Figure
 
 def _clean(fig, height=430):
     fig.update_layout(height=height, margin=dict(t=70, r=30, b=70, l=60),
@@ -127,33 +137,37 @@ def _clean(fig, height=430):
     return fig
 
 def register(key, fig):
-    FIGS[key] = fig         # שמירה למאגר שיתעכשמע ל-HTML
+    FIGS[key] = fig         # רישום למאגר שממנו נבנה ה-HTML
     fig.show()              # הצגה inline במחברת עצמה
     return fig
 
 age_order = [AGE_LABELS[k] for k in sorted(AGE_LABELS)]   # ["20-24","25-29",...,"75+"]
 ```
 
-**דגש חשוב:** ההפרדה בין "בניית הגרף" ל-"רישום הגרף" זו בחירה מכוונת. `register` הוא ה"חוזה" - כל מי שמסיים לבנות Figure חייב לקרוא לו כדי שיופיע (1) ב-`FIGS` שמנוצל בבניית ה-HTML, (2) inline במחברת עצמה למי שרץ אותה ב-Jupyter. זה מונע מצב שבו מישהו בונה גרף ושוכח לחבר אותו לדאשבורד.
+**נקודות טכניות:**
+
+- ההפרדה בין בניית הגרף לרישום הגרף היא בחירה מכוונת. `register` מהווה חוזה: כל גרף שנוצר חייב לעבור דרכו כדי להופיע גם ב-`FIGS` (שממנו ההרכבה של ה-HTML שולפת) וגם inline במחברת עבור מי שרץ אותה ב-Jupyter. המנגנון מונע מצב שבו גרף נבנה אך לא מחובר לדאשבורד.
 
 ---
 
-## תא 6 - קוד - טאב Young Generation (2 גרפים)
+## תא 6 — קוד — טאב Young Generation (2 גרפים)
 
-**מה זה עושה:** בונה 2 גרפי Plotly עבור הטאב Young Generation. במקור היו כאן 4 גרפים; הסרתי את `fig-young-radar` ואת `fig-young-coverage` לפי בקשה שהעלית באמצע הבנייה.
+**מה התא עושה:** בונה שני גרפי Plotly עבור הטאב Young Generation.
 
-**הגרפים שנשארו:**
+**הגרפים:**
 
-1. **fig-young-digital** - קו לפי גיל של אימוץ שירותים דיגיטליים פיננסיים (Crypto, בדיקת אשראי אונליין, בדיקת פנסיה אונליין). הצעירים דווקא מובילים ב-crypto ובבדיקת אשראי.
-2. **fig-young-satisfaction** - עמודות של רמת שביעות רצון מתכנון פרישה, רק בקבוצת 20-29. מדגיש כמה מהם "בכלל לא מרוצים" - זה ה-wake-up call החינוכי של הטאב.
+1. **fig-young-digital** — קו של אחוז אימוץ שירותים דיגיטליים פיננסיים לפי גיל (Crypto, בדיקת אשראי אונליין, בדיקת פנסיה אונליין). קבוצת הצעירים מובילה ב-Crypto ובבדיקת אשראי.
+2. **fig-young-satisfaction** — עמודות של רמת שביעות רצון מתכנון פרישה, בקבוצת 20-29 בלבד.
 
-**דגש חשוב:** הטאב Young Generation נשאר לא רק בגרפים - יש בו גם **סימולטור ריבית דריבית אינטראקטיבי** (הקוד שלו יושב ב-HTML בתא 10). המשתמש מגלה שהפקדת 500 ש"ח בחודש מגיל 25 עד 67 ב-6% ריבית מגיעה לכ-1.1 מיליון ש"ח. זו הנקודה החינוכית של הטאב לצעירים.
+**נקודות טכניות:**
+
+- טאב Young Generation מכיל גם **סימולטור ריבית דריבית אינטראקטיבי**, שהלוגיקה שלו יושבת בקוד ה-JavaScript שבתא 10. הסימולטור מציג שהפקדה של 500 ש"ח בחודש בין גיל 25 לגיל 67 בריבית 6% מגיעה לכ-1.1 מיליון ש"ח בסוף התקופה.
 
 ---
 
-## תא 7 - קוד - ענן מילים פיננסי (Word Cloud)
+## תא 7 — קוד — ענן מילים פיננסי (Word Cloud)
 
-**מה זה עושה:** מייצר תמונת PNG של ענן מילים שכולה מונחים פיננסיים, כשגודל כל מילה פרופורציונלי לספירה בפועל בדאטה של הסקר. התמונה נשמרת בזיכרון כ-base64 ומוטמעת בתוך ה-HTML הסופי.
+**מה התא עושה:** מייצר תמונת PNG של ענן מילים של מונחים פיננסיים, כשגודל כל מילה פרופורציונלי לספירה שלה בפועל בדאטה של הסקר. התמונה נשמרת בזיכרון כמחרוזת base64 ומוטמעת בתוך ה-HTML הסופי.
 
 **קטע קוד מרכזי:**
 
@@ -167,7 +181,7 @@ FIN_WEIGHTS = {
     "Bitcoin":         yes_count("InternetShilemMatbeaDig"),
     "Loan":            yes_count("HalvaaBank"),
     "Investments":     yes_count("HashkaotBank"),
-    ...   # 32 מונחים סה"כ
+    ...   # 32 מונחים בסך הכל
 }
 
 wc = WordCloud(width=1200, height=520, background_color="white",
@@ -178,17 +192,17 @@ wc.to_image().save(buf, format="PNG")
 WORDCLOUD_B64 = base64.b64encode(buf.getvalue()).decode("ascii")
 ```
 
-**דגשים חשובים לפגישה:**
+**נקודות טכניות:**
 
-- **לא ענן מילים גנרי מהאינטרנט** - כל שקלול מבוסס על ספירה אמיתית מהסקר. אם 1,093 אנשים ענו שיש להם פנסיה, המילה `Pension` מקבלת משקל 1,093.
-- **base64 embedding** - התמונה נכנסת לתוך ה-HTML כ-`<img src="data:image/png;base64,...">`, כך שאין קובץ PNG חיצוני. `index.html` שלם ועצמאי.
-- אחרי המיזוג, הענן חזר להיות מוצג בטאב Overview.
+- הענן אינו רשימה גנרית של מונחים; כל שקלול מבוסס על ספירה בפועל בדאטה. אם 1,093 משיבים ענו שיש להם פנסיה, המילה `Pension` מקבלת משקל 1,093.
+- **טכניקת ה-base64 embedding:** התמונה מוזרקת ל-HTML כ-`<img src="data:image/png;base64,...">`. אין קובץ PNG חיצוני; `index.html` נשאר שלם ועצמאי.
+- הענן מוצג בתחתית הטאב Overview, לאחר יתר תוכן הטאב.
 
 ---
 
-## תא 8 - קוד - מפת Folium של ישראל
+## תא 8 — קוד — מפת Folium של ישראל
 
-**מה זה עושה:** יוצר מפה אינטראקטיבית של ישראל (Folium שבנוי על Leaflet) עם 16 עיגולים - אחד לכל תת-מחוז (Nafa). גודל כל עיגול פרופורציונלי למספר המשיבים באותו אזור (סקאלת שורש - כדי שאזורים קטנים לא ייבלעו על ידי תל אביב).
+**מה התא עושה:** יוצר מפה אינטראקטיבית של ישראל (Folium מבוסס Leaflet) עם 16 עיגולים — אחד לכל תת-מחוז (Nafa). גודל העיגול פרופורציונלי למספר המשיבים באזור, לפי סקאלת שורש כדי שאזורים קטנים לא יטבעו לצד תל אביב.
 
 **קטע קוד מרכזי:**
 
@@ -198,7 +212,7 @@ m = folium.Map(location=[31.85, 35.10], zoom_start=8,
 
 for code_val, meta in NAFA.items():
     n = int(nafa_counts.get(code_val, 0))
-    radius = 6 + 22 * (n / max_c) ** 0.5      # scaling sqrt
+    radius = 6 + 22 * (n / max_c) ** 0.5      # sqrt scaling
     folium.CircleMarker(
         location=[meta["lat"], meta["lon"]], radius=radius,
         color="#1f5fc4", fill=True, fill_color="#2c7be5", fill_opacity=0.55,
@@ -206,104 +220,104 @@ for code_val, meta in NAFA.items():
         tooltip=folium.Tooltip(f"<b>{meta['name']}</b>: {n:,} respondents ...", sticky=True)
     ).add_to(m)
 
-MAP_SRCDOC = m.get_root().render()   # HTML מלא של המפה כמחרוזת אחת
+MAP_SRCDOC = m.get_root().render()   # HTML מלא של המפה כמחרוזת יחידה
 ```
 
-**דגשים חשובים לפגישה:**
+**נקודות טכניות:**
 
-- **אין `fit_bounds`** - קורא ל-`fit_bounds` ב-Folium 0.20 גורם ל-over-zoom (הוא נכנס למקסימום זום כדי לכסות את כל הגבולות; לישראל שהיא קטנה, זה חתך של רחוב). הבחירה של `zoom_start=8` מיצירה מסגרת נכונה.
-- **`MAP_SRCDOC` הוא string של HTML שלם עם JS ו-CSS משלו**. הוא מוזרק בהמשך ל-`<iframe srcdoc>` - כך Leaflet רץ בסביבה מבודדת ולא מתנגש עם ה-CSS/JS של הדאשבורד.
-- אחרי המיזוג, המפה חזרה להיות מוצגת בטאב Geography החדש.
+- **אין קריאה ל-`fit_bounds`.** ב-Folium 0.20, `fit_bounds` נכנס לזום מקסימלי כדי לכסות בדיוק את גבולות המרקרים; עבור ישראל שהיא קטנה, התוצאה היא זום ברמת רחוב. הבחירה של `zoom_start=8` מייצרת מסגרת נכונה.
+- **`MAP_SRCDOC` הוא מחרוזת HTML שלמה** הכוללת CSS ו-JS משל עצמה. היא מוזרקת בהמשך לתוך `<iframe srcdoc>` כך ש-Leaflet רץ בסביבה מבודדת ואינו מתנגש עם ה-CSS וה-JS של הדאשבורד.
+- המפה מוצגת בטאב עצמאי בשם Geography.
 
 ---
 
-## תא 9 - קוד - הרכבת תוכן HTML לכל טאב
+## תא 9 — קוד — הרכבת תוכן HTML לכל טאב
 
-**מה זה עושה:** התא הכי גדול והכי חשוב שלי. לוקח את התוצרים של שי ועובד + הגרפים והתמונות של הטאבים החדשים, ומרכיב מחרוזות HTML לכל אחד מ-5 הטאבים הראשיים: `OVERVIEW_HTML`, `DATA_QUALITY_HTML`, `DESCRIPTIVES_HTML`, `MODEL_PERF_HTML`, `MODEL_INTERP_HTML`. כל אחת מהמחרוזות נכנסת בהמשך למקום ההתאמה שלה ב-`HTML_TEMPLATE` (תא 10).
+**מה התא עושה:** התא המרכזי של Part 3. אוסף את התוצרים של שי ועובד יחד עם הגרפים והתמונות שנבנו בתאים הקודמים, ומרכיב מחרוזות HTML לכל אחד מחמשת הטאבים הראשיים: `OVERVIEW_HTML`, `DATA_QUALITY_HTML`, `DESCRIPTIVES_HTML`, `MODEL_PERF_HTML`, `MODEL_INTERP_HTML`. כל מחרוזת נכנסת בהמשך למקומה ב-`HTML_TEMPLATE` (בתא 10).
 
-**מבנה TAB TAB:**
+**מבנה כל טאב:**
 
-### `OVERVIEW_HTML` - טאב Overview
+### `OVERVIEW_HTML` — טאב Overview
 
-- **כרטיסי KPI:** מספר משיבים (6,907), מספר משתנים גולמיים, מספר predictors שנכנסו למודל, שנת הסקר (2024).
-- **ענן מילים** - `<img src="data:image/png;base64,{WORDCLOUD_B64}">` - הוחזר אחרי המיזוג.
-- **Working Principles של שי** - 5 עקרונות שיסודו הפרויקט: כלב הקובץ הגולמי נשאר ללא נגיעה; קודי `888888` ו-`999999` מומרים ל-NaN; לא מוחקים שורות רבות בהיחבא; לא סקיילינג בשלב זה; שקיפות מלאה מול ה-codebook.
-- **Structure summary (10 שורות ראשונות)** - טבלה מתא של שי עם דוגמאות עמודות + dtype + מספר ערכים ייחודיים + אחוז חסרים.
-- **Raw data head(10)** - 10 שורות ראשונות של `df` אחרי ניקוי בסיסי של שי.
-- **Features selected for the model (Ovad)** - "chips" של השמות של כל הפיצ'רים שעובד בחר.
+- ארבעה כרטיסי KPI: מספר משיבים (6,907), מספר משתנים גולמיים, מספר predictors שנכנסו למודל, שנת הסקר (2024).
+- Working Principles של שי — חמישה עקרונות שיסוד הפרויקט: הקובץ הגולמי נשאר ללא שינוי; קודי `888888` ו-`999999` מומרים ל-NaN; אין מחיקה שקטה של שורות רבות; אין scaling בשלב הזה; שקיפות מלאה מול ה-codebook.
+- Structure summary (עשר שורות ראשונות) — טבלה מ-Part 1 של שי המציגה שם עמודה, dtype, מספר ערכים ייחודיים ואחוז חסרים.
+- Raw data head(10) — עשר שורות ראשונות של `df` לאחר ניקוי בסיסי של שי.
+- Features selected for the model — chips של שמות הפיצ'רים שעובד בחר.
+- ענן מילים — `<img src="data:image/png;base64,{WORDCLOUD_B64}">` בתחתית הטאב.
 
-### `DATA_QUALITY_HTML` - טאב Data Quality
+### `DATA_QUALITY_HTML` — טאב Data Quality
 
-- **Missing values report per column** - **רשת רב-עמודתית של אריחים קומפקטיים**, אריח לכל משתנה, מציג את שם המשתנה ואחוז החסרים בו. צביעה לפי חומרה: אדום ≥50%, ענבר ≥20%, ירוק אחרת. בונה 324 אריחים - הרבה יותר קריא מטבלה של 324 שורות.
-- **Data dictionary** (10 שורות ראשונות) - הטבלה של שי שמרכזת: שם משתנה + התיאור מה-codebook של הלמ"ס + החלטת ניקוי.
-- **Drop candidates** (10 שורות ראשונות) - עמודות ששי סימן להסרה בגלל % חסרים גבוה או חוסר רלוונטיות.
-- **CBS codebook** (30 שורות ראשונות) - הצגת ה-codebook עצמו אחרי preprocessing שהוספתי (12 שורות מטא הוסרו, שמות עמודות תורגמו לאנגלית, ותוויות המשתנים המרכזיים תורגמו לאנגלית).
+- Missing values report per column — רשת רב-עמודתית של אריחים קומפקטיים. כל אריח מציג שם משתנה ואחוז חסרים; צביעה לפי חומרה: אדום עבור 50% ומעלה, ענבר עבור 20% ומעלה, ירוק אחרת. הצורה הרב-עמודתית מתאימה ל-324 משתנים בפריסה קריאה בהרבה מטבלה של 324 שורות.
+- Data dictionary (עשר שורות ראשונות) — טבלה של שי המרכזת שם משתנה, תיאור מה-codebook של הלמ"ס, והחלטת ניקוי.
+- Drop candidates (עשר שורות ראשונות) — עמודות ששי סימן להסרה בגלל אחוז חסרים גבוה או חוסר רלוונטיות.
+- CBS codebook (30 שורות ראשונות) — הצגת ה-codebook לאחר preprocessing: 12 שורות מטא הוסרו, שמות עמודות תורגמו לאנגלית, ותוויות המשתנים המרכזיים תורגמו לאנגלית.
 
-### `DESCRIPTIVES_HTML` - טאב Descriptives
+### `DESCRIPTIVES_HTML` — טאב Descriptives
 
-- לכל אחת מ-3 הקבוצות ב-`eda_groups` של שי (Demographic profile, Financial profile, Social profile) - מראה **התפלגות ה-value_counts** של כל משתנה בקבוצה עם עמודות אופקיות "mini bar plot" ב-HTML.
-- **התוויות מגיעות מהcodebook** דרך פונקציית helper `_lookup_label(var, code)` שאני בונה בתא הזה - היא מחזירה את `code_title` הרלוונטי, אחרי שהתא של preprocessing של ה-codebook תרגם את הערכים העבריים לאנגלית.
-- בסוף - **Distribution of `financial_risk_score`** - התפלגות ה-target המחושב של שי (סקאלה 0-7 של תסמיני סיכון פיננסי).
+- לכל אחת משלוש הקבוצות ב-`eda_groups` של שי (Demographic profile, Financial profile, Social profile) — התפלגות ה-value_counts של המשתנים בקבוצה, מוצגת כ-mini bar plot ב-HTML.
+- התוויות של הערכים המספריים מגיעות מהcodebook דרך פונקציית helper בשם `_lookup_label(var, code)` שמוגדרת בתא זה. הפונקציה מחזירה את `code_title` הרלוונטי מהקודבוק, שכבר תורגם לאנגלית בתא ה-preprocessing של הקודבוק (למשל `Male/Female` במקום `1/2`).
+- בסוף הטאב — התפלגות של `financial_risk_score`, ה-target המחושב של שי (סקאלה 0-7 של תסמיני סיכון פיננסי).
 
-### `MODEL_PERF_HTML` - טאב Model Performance
+### `MODEL_PERF_HTML` — טאב Model Performance
 
-- **Baseline comparison table** - טבלה שעובד בונה: מודלים שנוסו, מדדים (Accuracy, Precision, Recall, F1, ROC AUC).
-- **6 גרפי ביצועים ראשונים** מ-`saved_figures` (נוצרים ב-Part 2 של עובד ונלכדים אוטומטית דרך monkey-patch של `plt.show`) - מוטמעים כתמונות base64.
+- Baseline comparison table — טבלה של עובד המשווה מודלים לפי מדדים (Accuracy, Precision, Recall, F1, ROC AUC).
+- שישה גרפי ביצועים ראשונים מתוך `saved_figures`. המשתנה `saved_figures` נבנה ב-Part 2 של עובד דרך monkey-patch של `plt.show` שלוכד כל figure שנוצר. הגרפים מוטמעים כתמונות base64.
 
-### `MODEL_INTERP_HTML` - טאב Model Interpretation
+### `MODEL_INTERP_HTML` — טאב Model Interpretation
 
-- **6 גרפי SHAP הבאים** מ-`saved_figures` - Beeswarm, feature importance, dependence plots.
+- שישה גרפי SHAP הבאים מתוך `saved_figures` — Beeswarm, feature importance, dependence plots.
 
 **קטעי קוד מרכזיים:**
 
 ```python
 def _fig_to_img(fig, alt="figure", max_width_px=1000):
-    """ממיר matplotlib Figure ל-<img> base64 - מפה שי/עובד ל-HTML"""
+    """ממיר Figure של matplotlib ל-<img> base64. שימוש עיקרי בגרפי שי ועובד."""
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=90, bbox_inches="tight", facecolor="white")
     b64 = base64.b64encode(buf.getvalue()).decode("ascii")
     return f'<img src="data:image/png;base64,{b64}" alt="{alt}" ...>'
 
 def _df_to_html(df, max_rows=None, classes="datatable"):
-    """טבלה עם cap אופציונלי + הודעה 'Showing first X of Y rows'"""
+    """המרת DataFrame ל-HTML עם cap אופציונלי + כיתוב 'Showing first X of Y rows'."""
     if max_rows is not None and len(df) > max_rows:
         note = f'<div class="table-note">Showing first {max_rows} of {len(df):,} rows</div>'
         return note + df.head(max_rows).to_html(...)
     return df.to_html(...)
 
 def _lookup_label(_var, _code):
-    """שולף label מה-codebook (אחרי תרגום לאנגלית) עם fallback לקוד הגולמי"""
+    """שולף label מה-codebook (לאחר תרגום לאנגלית) עם fallback לקוד הגולמי."""
     _match = codebook.loc[(codebook["variavle_name"] == _var) &
                           (codebook["code"] == _code), "code_title"]
     return str(_match.iloc[0]).strip() if len(_match) else str(_code)
 ```
 
-**דגשים חשובים לפגישה:**
+**נקודות טכניות:**
 
-- **הפרדה מלאה בין TAB-בנייה ל-TAB-הצגה**. התא הזה בונה מחרוזות HTML בלבד. הדבקתן במסמך HTML מלא קורית בתא הבא. זו הפרדה שהופכת את הדאשבורד לקל לתחזוקה.
-- **קפיצות זיכרון** - כל מטריצת Phi-K של שי (מטריצת קורלציות רב-סוגית שדורשת כמה GB) לא מוצגת כאן - הוצאתי אותה כדי לא לפוצץ את ה-kernel. הערה מודפסת בטאב Descriptives.
-- **`_lookup_label` הוא הלב של תיקון "התוויות בעברית"**. הבעיה: הקוד של שי לא נגע - הוא מייצר גרפים עם `.value_counts()` וזה מציג קודים מספריים 1, 2, 3. הפתרון: תא preprocessing של ה-codebook תרגם את `code_title` לאנגלית (בזיכרון גם ובקובץ ה-Excel), ואז `_lookup_label(var, code)` מחזיר את התווית באנגלית לכל שילוב.
+- **הפרדה מלאה בין בניית התוכן להצגתו.** התא הזה בונה מחרוזות HTML בלבד. ההרכבה של מסמך ה-HTML המלא מתבצעת בתא הבא. ההפרדה שומרת על תחזוקיות: שינוי בתוכן טאב אינו דורש נגיעה בתבנית ה-HTML.
+- **קפיצות זיכרון:** מטריצת Phi-K של שי (קורלציות רב-סוגית) מצריכה כמה GB ואינה מוצגת כאן; היא הוסרה כדי לא לפוצץ את ה-kernel, וכיתוב הבהרה מופיע בטאב Descriptives.
+- **`_lookup_label` הוא הגורם המרכזי בטיפול בתוויות שהיו בעברית.** הקוד של שי משתמש ב-`.value_counts()` על משתני הסקר, שמחזירה קודים מספריים (1, 2, 3). ה-preprocessing של הקודבוק (הוסף במחברת המאוחדת) תרגם את `code_title` לאנגלית גם בזיכרון וגם בקובץ ה-Excel; `_lookup_label(var, code)` מחזיר את התווית המתורגמת לכל שילוב של משתנה וקוד. הקוד המקורי של שי לא נגע.
 
 ---
 
-## תא 10 - קוד - HTML_TEMPLATE + הרכבת index.html
+## תא 10 — קוד — HTML_TEMPLATE + הרכבת index.html
 
-**מה זה עושה:** התא **הגדול והקריטי ביותר** של הפרויקט שלי. בונה קובץ HTML עצמאי אחד (`index.html`) שכולל:
+**מה התא עושה:** התא הגדול והקריטי ביותר של Part 3. בונה קובץ HTML עצמאי אחד (`index.html`) שכולל:
 
-- כל ה-CSS (~800 שורות)
-- Plotly.js מלא מוטמע (~3.5 MB) כדי שהאתר יעבוד אופליין
-- כל ה-JavaScript של השאלון, הדאשבורד, הטאבים, המפה, הסימולטור, ה-Gauge, ה-profile chart
-- את כל תוצרי הטאבים (`OVERVIEW_HTML`, `DATA_QUALITY_HTML`, ...) שהתא הקודם בנה
-- את המפה שהתא של Folium בנה (MAP_SRCDOC)
-- את השאלון (QUIZ) כ-JSON
+- כל ה-CSS של הדאשבורד (כ-800 שורות).
+- ספריית Plotly.js המלאה מוטמעת (כ-3.5 MB) כדי שהאתר יעבוד אופליין.
+- כל ה-JavaScript של השאלון, הדאשבורד, הטאבים, המפה, הסימולטור, ה-Gauge, וגרף הפרופיל.
+- את כל תוצרי הטאבים (`OVERVIEW_HTML`, `DATA_QUALITY_HTML`, ...) שהתא הקודם בנה.
+- את המפה שהתא של Folium בנה (`MAP_SRCDOC`).
+- את השאלון (`QUIZ`) כמחרוזת JSON.
 
-**מנגנון ה-Template:** התא בונה `HTML_TEMPLATE` כמחרוזת רגילה של פייתון עם **placeholders** - `__PLOTLYJS__`, `__FIGS__`, `__QUIZ__`, `__MAP_SRCDOC__`, `__OVERVIEW__`, `__DATA_QUALITY__`, `__DESCRIPTIVES__`, `__MODEL_PERF__`, `__MODEL_INTERP__`. בסוף - `HTML_TEMPLATE.replace(...)` מוחלף כל placeholder בערך הרלוונטי.
+**מנגנון ה-Template:** התא בונה את `HTML_TEMPLATE` כמחרוזת Python רגילה עם placeholders — `__PLOTLYJS__`, `__FIGS__`, `__QUIZ__`, `__MAP_SRCDOC__`, `__OVERVIEW__`, `__DATA_QUALITY__`, `__DESCRIPTIVES__`, `__MODEL_PERF__`, `__MODEL_INTERP__`. בסוף התא, שרשרת של `.replace(...)` מחליפה כל placeholder בערך הרלוונטי.
 
-**קטע קוד מרכזי - שרשרת ההחלפה:**
+**קטע קוד מרכזי — שרשרת ההחלפה:**
 
 ```python
 def js_safe(s):
-    """מנטרל '</script>' בתוך JSON strings שנמצאים בתוך <script> block."""
+    """מנטרל '</script>' בתוך JSON strings שמוטמעים בתוך <script> block."""
     return s.replace("</script>", "<\\/script>").replace("</Script>", "<\\/Script>")
 
 figs_payload = {name: json.loads(fig.to_json()) for name, fig in FIGS.items()}
@@ -323,13 +337,13 @@ with open("index.html", "w", encoding="utf-8") as f:
     f.write(html)
 ```
 
-**דגש חשוב על `js_safe`:** בעיה טיפוסית ב-HTML embedding של JSON: אם מחרוזת JSON מכילה `</script>`, הדפדפן חושב שסקריפט הסתיים ושובר את כל הדף. `js_safe` מחליף `</script>` ל-`<\/script>` (חוקי ב-JSON, לא סוגר את ה-script). זה סוג של בעיה שקל לפספס - שאלה קלאסית של מרצה: "מה קורה אם ה-`code_title` הזה מכיל `</script>`?". התשובה שלי: `js_safe` דואג לזה.
+**נקודה חשובה על `js_safe`:** מלכודת ידועה ב-HTML embedding של JSON — אם מחרוזת JSON מכילה `</script>`, הדפדפן מפרש זאת כסיום של בלוק הסקריפט וכל הדף נשבר. `js_safe` מחליף `</script>` ב-`<\/script>` (חוקי ב-JSON, לא סוגר את ה-script). זו בעיה שקל לפספס.
 
 ### הפונקציות המרכזיות ב-JavaScript של index.html
 
-בנוסף לתוכן, מסמך ה-HTML מכיל **בלוק סקריפט אחד גדול** עם כל הלוגיקה. הפונקציות המרכזיות שלו:
+בנוסף לתוכן, מסמך ה-HTML מכיל בלוק סקריפט אחד גדול עם כל הלוגיקה. הפונקציות המרכזיות שלו:
 
-#### `buildQuiz()` - בונה את השאלון
+#### `buildQuiz()` — בניית השאלון
 
 ```js
 function buildQuiz() {
@@ -353,9 +367,9 @@ function buildQuiz() {
 }
 ```
 
-מסתובב על מערך `QUIZ` (10 שאלות), יוצר `<div>` לכל שאלה, ולכל אחת מוסיף `<label>` עם `<input type="radio">` לכל אפשרות. הרדיו-בטן משתמש ב-`name=q.id` (Q1, Q2, ...) כדי שרק אחד יבחר בכל שאלה.
+הפונקציה עוברת על מערך `QUIZ` (10 שאלות), יוצרת `<div>` לכל שאלה, ולכל אחת מוסיפה `<label>` עם `<input type="radio">` לכל אפשרות. שם ה-radio (`name=q.id`) מבטיח שרק אפשרות אחת נבחרת בכל שאלה.
 
-#### `submitQuiz()` - שער הכניסה לדאשבורד
+#### `submitQuiz()` — שער הכניסה לדאשבורד
 
 ```js
 function submitQuiz() {
@@ -380,11 +394,11 @@ function submitQuiz() {
 }
 ```
 
-מוודא שכל 10 השאלות נענו (אם לא, מציג שגיאה עם רשימת השאלות החסרות ולא מכניס לדאשבורד). אחרי, סופר כמה שאלות ידע ענה נכון (ה-score לגייג'), מסתיר את השאלון, מציג את הדאשבורד ואת כפתור Back-to-quiz בטופ, בונה את טבלת השאלות של הפרופיל, בונה את המפה, ומראה את טאב Overview.
+הפונקציה בודקת שכל עשר השאלות נענו. אם לא, מציגה שגיאה עם רשימת השאלות החסרות ואינה מאפשרת כניסה לדאשבורד. אם כן, סופרת כמה שאלות ידע נענו נכון (הציון של Gauge), מסתירה את השאלון, מציגה את הדאשבורד ואת כפתור ה-Back בטופ, בונה את טבלת השאלות של הפרופיל, בונה את המפה, ומראה את טאב Overview.
 
-**דגש חשוב:** כפי שרואים כאן, **אף גרף לא מרונדר לפני שהמשתמש עונה על כל 10 השאלות**. השאלון הוא Gate של ממש. Plotly.newPlot לא נקרא ל-Overview עד ל-`showTab("overview")` שנקרא בשורה האחרונה של `submitQuiz`.
+הערה חשובה: אף גרף אינו מרונדר לפני `submitQuiz` מוצלח. `Plotly.newPlot` נקרא לראשונה בתוך `showTab("overview")` שבשורה האחרונה של הפונקציה.
 
-#### `showTab(name)` - החלפת טאב + Lazy Rendering
+#### `showTab(name)` — החלפת טאב + Lazy Rendering
 
 ```js
 function showTab(name) {
@@ -412,17 +426,17 @@ function showTab(name) {
 }
 ```
 
-**עובד ב-3 שלבים:**
+הפונקציה פועלת בשלושה שלבים:
 
-1. **מסמן את הכפתור הפעיל** (`.tabbtn.active`) ומסתיר/מציג את הפאנלים המתאימים (`display: block/none`).
-2. **Lazy rendering:** רק אם `rendered[fid]` הוא false, קורא ל-`Plotly.newPlot`. אם כבר רונדר קודם, קורא ל-`Plotly.Plots.resize` כדי שיתאים לרוחב הנוכחי של הפאנל. זו אופטימיזציית ביצועים חשובה - Plotly.newPlot איטי; לא רוצים לרנדר את כל 12 הגרפים בהתחלה, רק לפי צורך.
-3. **טיפול מיוחד לטאבים לא-Plotly:**
-   - `geography` -> מפעיל את `buildMap()` שמכניס `<iframe srcdoc="MAP_SRCDOC">` ל-`#fig-map`, ואז אחרי 80ms קורא ל-`refreshMap()` שנוגע ב-Leaflet כדי שיתאים לרוחב.
-   - `young` -> קורא ל-`initSimulator()` שקושר את הסליידרים של סימולטור ריבית דריבית לפונקציית ה-render שלו.
+1. **סימון הכפתור הפעיל** (`.tabbtn.active`) והצגה/הסתרה של הפאנלים המתאימים (`display: block/none`).
+2. **Lazy rendering:** רק אם `rendered[fid]` הוא false, נקראת `Plotly.newPlot`. אם הגרף כבר רונדר, נקראת `Plotly.Plots.resize` כדי שיתאים לרוחב הנוכחי של הפאנל. זו אופטימיזציה חשובה: `Plotly.newPlot` איטי, אז אין צורך לרנדר את כל הגרפים מיד עם טעינת הדף.
+3. **טיפול מיוחד בטאבים שאינם Plotly טהור:**
+   - `geography` — קורא ל-`buildMap()` שמכניס `<iframe srcdoc="MAP_SRCDOC">` לתוך `#fig-map`, ואז לאחר 80ms קורא ל-`refreshMap()` שמעדכן את Leaflet לרוחב החדש.
+   - `young` — קורא ל-`initSimulator()` שקושר את הסליידרים של סימולטור ריבית דריבית לפונקציית ה-render שלו.
 
-**דגש חשוב:** למה 80ms? כי CSS `display: block` הוא סינכרוני אבל layout reflow לוקח לדפדפן כמה מילישניות. Leaflet ו-Plotly קוראים את `getBoundingClientRect()` בזמן שהם מתחילים, ואם עדיין הכל בגודל 0 - הם מרנדרים דבר קטן ולא מתקנים. `setTimeout(..., 80)` נותן לדפדפן זמן לחשב את הגודל.
+הסיבה ל-80ms: CSS `display: block` הוא סינכרוני, אך layout reflow של הדפדפן לוקח כמה מילישניות. Leaflet ו-Plotly קוראים ל-`getBoundingClientRect()` בזמן אתחול; אם עדיין הכל בגודל 0, הם מרנדרים תוכן קטן ואינם מתקנים אחר כך. `setTimeout(..., 80)` נותן לדפדפן זמן לחשב את הגודל.
 
-#### `buildMap()` + `refreshMap()` - הזרקת המפה + נדנוד Leaflet
+#### `buildMap()` + `refreshMap()` — הזרקת המפה ועדכון Leaflet
 
 ```js
 function buildMap() {
@@ -442,22 +456,22 @@ function refreshMap() {
   var win = iframe.contentWindow;
   var mapKey = Object.keys(win).find(function (k) { return k.indexOf('map_') === 0; });
   if (mapKey && win[mapKey] && win[mapKey].invalidateSize) {
-    win[mapKey].invalidateSize();   // Leaflet: מודיע שהמסגרת שינתה גודל
+    win[mapKey].invalidateSize();   // Leaflet: מודיע שגודל המסגרת השתנה
   }
 }
 ```
 
-**נקודה עדינה:** Folium מייצר משתנה גלובלי בתוך ה-iframe בשם `map_<hash>`. אני מוצא אותו דרך `Object.keys(win).find(k => k.startsWith('map_'))` ואז קורא ל-`invalidateSize()` שלו - Leaflet API סטנדרטי שאומר "המסגרת שלי שינתה גודל, חשב מחדש". בלי זה, אם המפה נטענה בזמן שהפאנל היה `display:none` (רוחב 0), היא תיראה מצומקת.
+נקודה עדינה: Folium מייצר משתנה גלובלי בתוך ה-iframe בשם `map_<hash>`. המשתנה נמצא באמצעות `Object.keys(win).find(k => k.startsWith('map_'))`, ואז נקראת עליו `invalidateSize()` — API של Leaflet שמורה לספרייה לחשב מחדש את הגודל. בלי הקריאה הזו, אם המפה נטענה בזמן שהפאנל היה במצב `display:none` (רוחב 0), היא תראה מצומקת.
 
-#### `buildGauge()` - Gauge חצי-עגול לציון
+#### `buildGauge()` — Gauge חצי-עגול לציון
 
-בונה SVG של Gauge חצי-עגול עם 3 קשתות (אדום/כתום/ירוק לפי טווח הציון), עם מחט שמצביעה על `userScore/5 * 100` אחוז. כתוב בעיקר ב-SVG paths ידניים כי Plotly לא מספק Gauge לחצי-עיגול מיושר.
+בונה SVG של Gauge חצי-עגול עם שלוש קשתות (אדום/כתום/ירוק לפי טווח הציון) ומחט המצביעה על `userScore/5 * 100` אחוז. השימוש ב-SVG paths ידניים נובע מכך ש-Plotly אינו מספק Gauge חצי-עגול מיושר בברירת המחדל.
 
-#### `buildProfileChart()` - השוואה שלך מול האוכלוסייה
+#### `buildProfileChart()` — השוואת המשתמש לאוכלוסייה
 
-בונה גרף Plotly של עמודות אופקיות: לכל שאלת התנהגות (Q3, Q4, Q6, Q7, Q9), עמודה אחת מציגה את התשובה של המשתמש (Yes=100, No=0), עמודה שנייה מציגה את `popYes` של האוכלוסייה. המשתמש רואה מיידית: "אני מקדים את הממוצע בפנסיה, אבל אחריו בקרן השתלמות".
+בונה גרף Plotly של עמודות אופקיות. לכל שאלת התנהגות (Q3, Q4, Q6, Q7, Q9), עמודה אחת מציגה את התשובה של המשתמש (Yes=100, No=0), ועמודה שנייה מציגה את `popYes` של האוכלוסייה. המשתמש רואה מיידית באילו התנהגויות הוא מקדים את הממוצע ובאילו מפגר אחריו.
 
-#### `buildKnowledgeTable(a)` - הטבלה המחודשת של הפרופיל
+#### `buildKnowledgeTable(a)` — הטבלה של טאב Your Profile
 
 ```js
 function buildKnowledgeTable(a) {
@@ -482,9 +496,9 @@ function buildKnowledgeTable(a) {
 }
 ```
 
-מציגה את **כל 10 השאלות** (במקור הציגה רק שאלות ידע). לכל שורה יש תג צבע: **ירוק "From social survey"** לשאלות התנהגות שיש להן משנה תוקף כי הן נמצאות בסקר הרשמי של הלמ"ס, ו**כחול "Knowledge check"** לשאלות ידע שאני הוספתי כדי לבחון אוריינות פיננסית. עבור שאלות התנהגות מוצג `popYes` במקום "תשובה נכונה"; עבור שאלות ידע מוצגים "Correct/Wrong".
+הטבלה מציגה את כל עשר השאלות. לכל שורה תג צבע: `From social survey` (ירוק) לשאלות התנהגות הנמצאות בסקר הרשמי של הלמ"ס, ו-`Knowledge check` (כחול) לשאלות ידע. עבור שאלות התנהגות מוצג `popYes` (אחוז ה"כן" באוכלוסייה) במקום "תשובה נכונה"; עבור שאלות ידע מוצגים "Correct" או "Wrong".
 
-#### `renderSim()` + `initSimulator()` - סימולטור ריבית דריבית
+#### `renderSim()` + `initSimulator()` — סימולטור ריבית דריבית
 
 ```js
 function renderSim() {
@@ -496,7 +510,6 @@ function renderSim() {
   var months   = years * 12;
   var future   = monthly * (Math.pow(1 + r, months) - 1) / r;   // FV של אנואיטי
   el("sim-result").textContent = fmtNIS(future);
-  // ... עוד קריאה לגרף השוואה של "התחלת השקעה מוקדם מול מאוחר"
 }
 
 function initSimulator() {
@@ -507,9 +520,9 @@ function initSimulator() {
 }
 ```
 
-הנוסחה הקלאסית של Future Value של אנואיטי (הפקדה חוזרת) - `M * ((1+r)^n - 1) / r`. הסימולטור משמש את הרעיון החינוכי של הטאב: "התחל להפריש מוקדם - הריבית דריבית עושה את העבודה".
+הנוסחה של Future Value של אנואיטי (הפקדה חוזרת): `M * ((1+r)^n - 1) / r`. הסימולטור ממחיש את היתרון של הפקדה מוקדמת: הריבית דריבית מכפילה את התוצאה עבור מי שמתחיל מוקדם.
 
-#### `backToQuiz()` - חזרה למסך השאלון
+#### `backToQuiz()` — חזרה למסך השאלון
 
 ```js
 function backToQuiz() {
@@ -526,7 +539,7 @@ function backToQuiz() {
 }
 ```
 
-מאפס את כל הרדיו-בטנס, מנקה שגיאה, מעדכן מונה "Answered 0/10", מסתיר את הדאשבורד, מציג את מסך השאלון בחזרה, מסתיר את כפתור ה-Back מהטופ. **הכפתור עצמו** בטופ נראה כך:
+הפונקציה מאפסת את כל ה-radio buttons, מנקה שגיאה קודמת, מעדכנת את מונה ההתקדמות ל-"Answered 0/10", מסתירה את הדאשבורד, מציגה שוב את מסך השאלון, ומסתירה את כפתור ה-Back מהטופ. הכפתור עצמו בטופ בנוי כך:
 
 ```html
 <button id="topbar-back" class="home-btn" style="display:none" onclick="backToQuiz()">
@@ -534,16 +547,16 @@ function backToQuiz() {
 </button>
 ```
 
-`style="display:none"` בטעינה - עולה רק אחרי submitQuiz מוצלח.
+הכפתור מוסתר בטעינה (`style="display:none"`) ומופיע רק אחרי submitQuiz מוצלח.
 
 ---
 
-## תא 11 - קוד - שרת HTTP מקומי (Colab-safe)
+## תא 11 — קוד — שרת HTTP מקומי (Colab-safe)
 
-**מה זה עושה:** התנהגות שונה לפי סביבה:
+**מה התא עושה:** מגיב באופן שונה לפי סביבת ההרצה:
 
-- **מקומית (Jupyter):** מרים שרת פייתון פשוט (`http.server`) על 127.0.0.1 בפורט 8890 (ואם תפוס - 8891, 8892 וכו'), ופותח את `index.html` בדפדפן דרך הפורט הזה. השרת רץ ברקע ב-thread daemon.
-- **Colab:** אין דפדפן וגם אין גישה ל-127.0.0.1 מהצד של המשתמש. במקום זאת קורא ל-`google.colab.files.download(OUT_HTML)` שמדליק הורדת קובץ בדפדפן של המשתמש.
+- **מקומית (Jupyter):** מרים שרת פייתון פשוט (`http.server`) על 127.0.0.1 בפורט 8890 (ואם תפוס — 8891, 8892 וכן הלאה), ופותח את `index.html` בדפדפן דרך הפורט הזה. השרת רץ ברקע ב-thread daemon.
+- **Colab:** אין דפדפן ואין גישה ל-127.0.0.1 מהצד של המשתמש. במקום זאת התא קורא ל-`google.colab.files.download(OUT_HTML)`, שמפעיל הורדה של הקובץ לדפדפן של המשתמש.
 
 **קטע קוד מרכזי:**
 
@@ -560,35 +573,35 @@ else:
         webbrowser.open(LOCAL_URL)
 ```
 
-**דגשים חשובים לפגישה:**
+**נקודות טכניות:**
 
-- **למה בכלל שרת מקומי ולא סתם `file://index.html`?** קבצי HTML שנפתחים בפרוטוקול `file://` חוסמים לפעמים אלמנטים כמו `iframe srcdoc` (בגלל Same-Origin Policy) או fonts חיצוניים. `http://127.0.0.1` פותר את זה ומחקה בדיוק את סביבת GitHub Pages.
-- **הקובץ שנפתח בשרת המקומי הוא בדיוק אותו קובץ** שמתפרסם ב-GitHub Pages - סביבת פיתוח = סביבת ייצור. אין הפתעות בפריסה.
-- **Thread daemon:** ה-`threading.Thread(target=httpd.serve_forever, daemon=True)` דואג שהשרת ייסגר כשה-kernel של הנוטבוק ייסגר. אין תהליכי zombie.
-
----
-
-## הקשר Cross-part: איך הוצאתי מ-Shai ומ-Ovad
-
-השלמה חשובה שמופיעה לרוחב כל התאים למעלה: אני מסתמך על תוצרים של Parts 1+2 בשני מסלולים:
-
-1. **In-memory (במצב Restart & Run All הסטנדרטי):** משתני זיכרון גלובליים - `raw`, `structure_summary`, `data_dictionary`, `eda_groups`, `codebook`, `model_data`, `features`, `cv_results`, `saved_figures`, `best_model`.
-
-2. **קבצי handoff על הדיסק (למקרה של Part-3-only):**
-   - `model data.csv` - הדאטה הנקי של שי (מאותה קבוצת פיצ'רים שהזין את המודל של עובד)
-   - `xgb_model.pkl` - ה-pipeline המאומן של עובד (best_estimator_ מה-GridSearch)
-   - `shai_state.pkl` - dict של כל תוצרי הזיכרון של שי (`raw`, `structure_summary`, `data_dictionary`, `eda_groups`, `codebook`, `model_data`)
-   - `ovad_state.pkl` - dict של כל תוצרי הזיכרון של עובד (`features`, `cv_results`, `saved_figures`)
-
-בסביבת Colab, תא ה-Handoff הראשון שלי (תא 1 למעלה) בודק אם ה-globals ריקים; אם כן, מציע לך להעלות את 3 הקבצים ופורק אותם ל-`globals()`.
+- **הצורך בשרת מקומי:** קבצי HTML הנפתחים ב-`file://` חוסמים לעיתים אלמנטים כמו `iframe srcdoc` (מדיניות Same-Origin) או פונטים חיצוניים. `http://127.0.0.1` פותר זאת ומחקה את סביבת GitHub Pages.
+- **סביבת הפיתוח זהה לסביבת הייצור:** הקובץ שנפתח בשרת המקומי הוא בדיוק אותו קובץ המתפרסם ב-GitHub Pages. אין הפתעות בפריסה.
+- **thread daemon:** ה-`threading.Thread(target=httpd.serve_forever, daemon=True)` מבטיח שהשרת ייסגר עם סגירת ה-kernel של המחברת, ולא יישאר תהליך zombie.
 
 ---
 
-## סיכום קצר לפגישה
+## הקשר Cross-part: התלויות ב-Shai וב-Ovad
 
-- **המחברת המאוחדת מורכבת מ-3 חלקים** שרצים ברצף: EDA של שי, מודל של עובד, דאשבורד שלי. הזרימה עוברת גם בזיכרון (משתנים גלובליים) וגם בקבצי handoff שאני הוספתי (`shai_state.pkl`, `ovad_state.pkl`, `xgb_model.pkl`) - כדי לתמוך גם ב-Part-3-only בסביבת Colab.
-- **הדאשבורד הוא קובץ HTML אחד עצמאי** (`index.html`) - Plotly.js מוטמע (~3.5 MB), כל הגרפים embedded, כל הטבלאות embedded, המפה כ-iframe srcdoc, ענן המילים כ-base64. אין שרת ייצור. GitHub Pages פשוט מגיש קובץ סטטי.
-- **השאלון חוסם את הכניסה לדאשבורד** - אף גרף לא מרונדר עד ל-`submitQuiz()` מוצלח. `Plotly.newPlot` הוא lazy per-tab (רק כשהטאב נפתח) ומקטמן על `Plotly.Plots.resize` כשחוזרים אליו.
-- **8 טאבים סופיים:** Overview (עם word cloud), Data Quality, Descriptives, Model Performance, Model Interpretation, Young Generation, **Geography** (הוחזרה מפת Folium אחרי בקשה מפורשת), Your Profile.
-- **טאב Your Profile מציג את כל 10 השאלות** עם תגי צבע ("From social survey" ירוק לשאלות התנהגות שיש להן משנה תוקף כי הן בסקר הרשמי, "Knowledge check" כחול לשאלות ידע שהוספתי).
-- **תמיכה מלאה ב-Colab:** תא upload prompt לקבצי הקלט, `try/except` על drive.mount, download אוטומטי של index.html במקום שרת מקומי.
+Part 3 מסתמך על תוצרים של Parts 1 ו-2 בשני מסלולים מקבילים:
+
+1. **In-memory (במצב Restart & Run All):** משתני זיכרון גלובליים — `raw`, `structure_summary`, `data_dictionary`, `eda_groups`, `codebook`, `model_data`, `features`, `cv_results`, `saved_figures`, `best_model`.
+
+2. **קבצי handoff על הדיסק (למצב Part-3-only):**
+   - `model data.csv` — הדאטה הנקי של שי (אותו set של פיצ'רים שהזין את המודל של עובד).
+   - `xgb_model.pkl` — ה-pipeline המאומן של עובד (`best_estimator_` מ-GridSearchCV).
+   - `shai_state.pkl` — dict של כל תוצרי הזיכרון של שי (`raw`, `structure_summary`, `data_dictionary`, `eda_groups`, `codebook`, `model_data`).
+   - `ovad_state.pkl` — dict של כל תוצרי הזיכרון של עובד (`features`, `cv_results`, `saved_figures`).
+
+בסביבת Colab, תא ה-Handoff הראשון של Part 3 (תא 1 לעיל) בודק אם ה-globals ריקים; במקרה כזה הוא מציע להעלות את שלושת הקבצים ופורק אותם ל-`globals()`.
+
+---
+
+## סיכום
+
+- המחברת המאוחדת מורכבת משלושה חלקים הרצים ברצף: EDA של שי, מודל של עובד, דאשבורד של Or. הזרימה עוברת גם בזיכרון (משתנים גלובליים) וגם בקבצי handoff (`shai_state.pkl`, `ovad_state.pkl`, `xgb_model.pkl`) לתמיכה גם ב-Part-3-only בסביבת Colab.
+- הדאשבורד הוא קובץ HTML יחיד ועצמאי (`index.html`) — Plotly.js מוטמע (כ-3.5 MB), כל הגרפים embedded, כל הטבלאות embedded, המפה כ-iframe srcdoc, ענן המילים כ-base64. אין שרת ייצור. GitHub Pages מגיש קובץ סטטי.
+- השאלון חוסם את הכניסה לדאשבורד — אף גרף אינו מרונדר לפני `submitQuiz()` מוצלח. `Plotly.newPlot` מופעל בעצלתיים per-tab (רק כשהטאב נפתח), ו-`Plotly.Plots.resize` מטפל בחזרה לטאב שכבר רונדר.
+- שמונה טאבים בסופו של דבר: Overview (עם word cloud בתחתית), Data Quality, Descriptives, Model Performance, Model Interpretation, Young Generation, Geography (מפת Folium), Your Profile.
+- טאב Your Profile מציג את כל עשר השאלות עם תגי צבע: `From social survey` (ירוק) לשאלות התנהגות הנמצאות בסקר הרשמי, ו-`Knowledge check` (כחול) לשאלות ידע.
+- תמיכה מלאה ב-Colab: תא upload prompt לקבצי הקלט, `try/except` על `drive.mount`, הורדה אוטומטית של `index.html` במקום שרת מקומי.
