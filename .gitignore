@@ -4,8 +4,9 @@ data/
 *.parquet
 *.csv
 
-# ... except the team plan
+# ... except the team plan and the merge-changes summary
 !pipeline.xlsx
+!changes_after_merge.xlsx
 
 # Python
 __pycache__/
