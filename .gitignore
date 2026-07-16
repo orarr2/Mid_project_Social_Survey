@@ -4,9 +4,13 @@ data/
 *.parquet
 *.csv
 
-# ... except the team plan and the merge-changes summary
+# ... except the team plan, merge-changes summary, and the two CBS input files
+# used by the merged notebook (kept in-repo so Colab / any environment can
+# fetch them via a fixed raw-GitHub URL instead of prompting for an upload).
 !pipeline.xlsx
 !changes_after_merge.xlsx
+!data_24.xlsx
+!H20241501codebook.xlsx
 
 # Python
 __pycache__/
