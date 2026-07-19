@@ -47,16 +47,10 @@ _stale = any(_need(v) for v in
 
 if _stale:
     _missing = [f for f in _PART3_REQUIRED if not os.path.exists(f)]
-    if _missing and IN_COLAB:
-        print(f"Missing handoff files on Colab: {_missing}")
-        from google.colab import files
-        _uploaded = files.upload()
-        _missing = [f for f in _PART3_REQUIRED if not os.path.exists(f)]
     if _missing:
         raise FileNotFoundError(
             f"Cannot run Part 3 alone without: {_missing}. "
-            "Either run Parts 1 and 2 first in this session, or provide the "
-            "three handoff files."
+            "Run Parts 1 and 2 first, or place the handoff files next to the notebook."
         )
     _shai_state = joblib.load("shai_state.pkl")
     _ovad_state = joblib.load("ovad_state.pkl")
@@ -74,22 +68,23 @@ print(f"Loaded xgb_model.pkl -> {type(model).__name__}")
 - **המנגנון של `globals().update(...)`:** קבצי pickle שומרים dict שמפתחותיו הם שמות משתנים ו-ערכיהם הם האובייקטים עצמם. כשקוראים אותם ומזריקים אותם ל-`globals()`, זה שקול להצהרה `raw = ...; structure_summary = ...; codebook = ...` וכן הלאה בשורה במחברת. אחרי הפעולה, שאר תאי Part 3 יכולים להשתמש במשתנים האלה כאילו הם הוגדרו במחברת במפורש. ההוכחה: תאים 128, 133 וכו' מתייחסים ל-`raw`, `codebook`, `features` בלי להצהיר עליהם — כי הם נטענו ל-globals כאן.
 - **למה `joblib.load` ולא `pickle.load`?** ה-dict של `ovad_state` מכיל את `saved_figures` — dict של אובייקטי `matplotlib.figure.Figure`. `pickle` הסטנדרטי לפעמים נופל על אובייקטי matplotlib עם קשרים למנועי backend. `joblib` מטפל בזה יותר יציב, וגם מבצע דחיסה טובה יותר לאובייקטים מספריים גדולים כמו arrays של numpy שנמצאים בפנים.
 - **`IN_COLAB`** מוגדר בתא ה-imports הראשון של המחברת המלאה (בראש, לפני החלוקה לחלקים) באמצעות `try/except google.colab`. אם ה-import מצליח — סימן שאנחנו ב-Colab (הוא מייצא את המודול הזה בסביבת ה-runtime שלו); אחרת — מקומית.
-- **מה קורה ב-Colab כשקובץ חסר?** `google.colab.files.upload()` פותח דיאלוג בדפדפן של המשתמש שמאפשר לבחור קבצים; הקבצים מועלים ל-`/content/` של ה-runtime, ולוגיקת הבדיקה ממשיכה לאחר מכן. אם המשתמש סוגר את הדיאלוג בלי להעלות — הקבצים עדיין חסרים ואנחנו זורקים `FileNotFoundError` ברור.
+- **מה קורה כשקובץ חסר?** התא זורק `FileNotFoundError` עם הודעה ברורה. המשתמש מבין שעליו להריץ את Parts 1 ו-2 קודם, או להביא את קבצי ה-pkl לאותה תיקייה של המחברת.
 
 ---
 
-## תא 2 — קוד — בדיקת סביבה + imports של Part 3
+## תא 2 — קוד — imports ייחודיים ל-Part 3
 
-**מה התא עושה:** בדיקה חוזרת שהחבילות שנחוצות ל-Part 3 קיימות (`plotly`, `folium`, `wordcloud`, `PIL`, `openpyxl`, `matplotlib`) ומייבא אותן. יש חפיפה עם תא ה-imports הכללי בראש המחברת; התא הזה קיים כדי להבטיח שאם מריצים רק את Part 3 מתחילתו, החבילות ייבדקו ויתייבאו גם אז.
+**מה התא עושה:** מייבא רק את החבילות שהחלק שלי צריך ולא נטענו כבר בתא ה-imports הראשי בראש המחברת. אחרי צמצום המצגת, התא הזה מכיל שבע שורות בלבד.
 
 **חבילות ותפקידן:**
 
-- **`plotly`** — מנוע הגרפים האינטראקטיביים בדפדפן. `plotly.express` (px) הוא API פשוט לגרפים סטנדרטיים, `plotly.graph_objects` (go) לגמישות מלאה. הגרפים נשמרים כ-JSON ומרונדרים בדפדפן על ידי `Plotly.js`.
+- **`webbrowser`** — פותח את הדאשבורד בדפדפן ברירת המחדל אחרי שהוא נבנה.
+- **`plotly.express` (px) + `plotly.graph_objects` (go)** — שני API שונים של Plotly. px לגרפים סטנדרטיים מהירים, go לשליטה מלאה על מבנה הגרף.
 - **`folium`** — עוטף Python מעל `Leaflet.js`, ספריית מפות ב-JavaScript. מייצר HTML מלא של מפה שאפשר להטמיע ב-iframe.
-- **`wordcloud`** — יוצר תמונת PNG של ענן מילים לפי משקלים. משתמש ב-`PIL` (Pillow) לרינדור התמונה.
-- **`openpyxl`** — קריאת `.xlsx`. פייתון לא יודע להוציא `.xlsx` בעצמו; זה הפרוטוקול של Microsoft ודורש decoder חיצוני.
-- **`matplotlib`** — לא מוצג בדאשבורד ישירות אלא משמש כ-backend של matplotlib.figure שהתא הבא של Part 3 טוען את הגרפים של Ovad שנשמרו ב-Part 2.
-- **`pyarrow`** — אופציונלי, לשמירה וטעינה של הדאטה בפורמט parquet. פורמט עמודי (column-oriented) שנטען פי 60 מהר יותר מקובץ Excel שקילו.
+- **`wordcloud`** — יוצר תמונת PNG של ענן מילים לפי משקלים.
+- **`px.defaults.template = "plotly_white"`** — מגדיר עיצוב ברירת מחדל לבן ונקי לכל גרפי plotly.express.
+
+**מה כבר קיים מתא ה-imports הראשי ולכן לא חוזר כאן:** `numpy`, `pandas`, `os`, `io`, `json`, `base64`, `warnings`, `matplotlib`, `joblib`, בדיקת גרסאות של החבילות, וזיהוי סביבת `IN_COLAB`.
 
 ---
 
@@ -97,31 +92,23 @@ print(f"Loaded xgb_model.pkl -> {type(model).__name__}")
 
 **מה התא עושה:** שלוש פעולות:
 
-1. **טעינת הדאטה** מקובץ `data_24.xlsx` עם מנגנון cache.
+1. **טעינת הדאטה** מקובץ `data_24.xlsx` בקריאה חד-פעמית.
 2. **הגדרת מילוני קידוד -> תווית לגרפים** (`AGE_LABELS`, `INCOME_LABELS`, `SAT_LABELS`, `LEFTOVER_LABELS`, `OPTIMISM_LABELS`).
 3. **הגדרת `NAFA`** — 16 קודי תת-מחוזות של הלמ"ס עם קואורדינטות (lat, lon). זה מזין את מפת Folium בטאב Geography.
 
-**מנגנון ה-cache — קטע קוד:**
+**קטע קוד:**
 
 ```python
 DATA_PATH = "data_24.xlsx"
-CACHE_PATH = "data_24_cache.parquet"
-
-if os.path.exists(CACHE_PATH):
-    df = pd.read_parquet(CACHE_PATH)      # מהיר: פחות משנייה
-else:
-    df = pd.read_excel(DATA_PATH)          # איטי: כדקה
-    try:
-        df.to_parquet(CACHE_PATH)
-    except Exception:
-        pass                                # נכשל בשקט אם pyarrow חסר
+df = pd.read_excel(DATA_PATH)
+print(f"Social Survey 2024 loaded: {df.shape[0]:,} rows x {df.shape[1]} columns")
 ```
 
 **נקודות טכניות מפורטות:**
 
-- **למה parquet מהיר יותר מ-xlsx?** `.xlsx` הוא פורמט מבוסס XML דחוס — כל תא הוא node ב-XML tree. פייתון צריך לפרש את ה-XML, לבנות את כל המבנים בזיכרון, ואז להמיר לטבלה. `.parquet` הוא פורמט בינארי עמודי (column-oriented): כל עמודה נשמרת ברצף אחד, עם dtype וסטטיסטיקות. `pandas.read_parquet` מקבל מיפוי ישיר של בלוקי בייטים לעמודות של pandas — כמעט זמן משיכה מדיסק בלבד.
+- **קריאה חד-פעמית של Excel**. הרצה של המחברת ב-Restart & Run All לוקחת כ-10-15 שניות רק לתא הזה. המחברת נועדה להצגה, לא לפיתוח חוזר, אז אין טעם ב-cache על הדיסק.
 - **המילונים משמשים אך ורק לתוויות ציר.** הערך הגולמי בדאטה נשאר `1`, `2` או `888888` — לא מוחלף. הטיפול בקודים השמורים מתבצע ב-Part 1 של שי; Part 3 שומר על הדאטה כפי שהוא כדי לא לחדור לתחום שלו.
-- **NAFA — 16 תת-מחוזות בישראל.** קוד `nafa` מופיע בדאטה של הלמ"ס לכל משיב; המיפוי בקובץ מקשר קוד לשם עברי + קואורדינטות. הקואורדינטות אינן מדויקות של מרכז הישוב; הן קרובות למרכז הגיאוגרפי של האזור. Folium בונה את המפה על סמך המפה הזאת.
+- **NAFA — 16 תת-מחוזות בישראל.** קוד `nafa` מופיע בדאטה של הלמ"ס לכל משיב; המיפוי בקובץ מקשר קוד לשם באנגלית + קואורדינטות. הקואורדינטות אינן מדויקות של מרכז הישוב; הן קרובות למרכז הגיאוגרפי של האזור. Folium בונה את המפה על סמך המפה הזאת.
 
 ---
 
@@ -171,9 +158,9 @@ for q in QUIZ:
 
 ---
 
-## תא 5 — קוד — Helpers משותפים (`FIGS`, `_clean`, `register`, `age_order`)
+## תא 5 — קוד — Helpers משותפים (`FIGS`, `_clean`, `age_order`)
 
-**מה התא עושה:** מגדיר את התשתית המשותפת לגרפי Plotly ב-Part 3. אחרי המיזוג עם החלקים של שי ועובד, נותרו רק שני גרפי Plotly ב-Part 3 (בטאב Young Generation); שאר הגרפים הוסרו מפני שהטאבים שלהם הוחלפו בטאבים חדשים המציגים תוצרים של Parts 1 ו-2. עם זאת, ה-helpers עדיין נחוצים לגרפים שנותרו.
+**מה התא עושה:** מגדיר את התשתית המשותפת לגרפי Plotly ב-Part 3. אחרי המיזוג עם החלקים של שי ועובד, נותרו רק שני גרפי Plotly ב-Part 3 (בטאב Young Generation). התא מכיל שלושה דברים בלבד.
 
 **קטע קוד מלא:**
 
@@ -181,7 +168,7 @@ for q in QUIZ:
 FIGS = {}   # dict מרכזי - מיפוי key -> Plotly Figure
 
 def _clean(fig, height=430):
-    """מסיר גרידים, מגדיר טיפוגרפיה אחידה, מרכז כותרות, מבטל רקעים."""
+    """Remove gridlines, set consistent typography and margins."""
     fig.update_layout(
         height=height, margin=dict(t=70, r=30, b=70, l=60),
         font=dict(family="Segoe UI, Arial", size=13),
@@ -194,20 +181,14 @@ def _clean(fig, height=430):
                      linecolor="#d1d5db", ticks="outside", tickcolor="#d1d5db")
     return fig
 
-def register(key, fig):
-    """שומר ב-FIGS ומציג inline במחברת. חוזה של Part 3."""
-    FIGS[key] = fig
-    fig.show()
-    return fig
-
 age_order = [AGE_LABELS[k] for k in sorted(AGE_LABELS)]
-# תוצאה: ["20-24","25-29","30-34",...,"75+"] - כדי לשמור על סדר גילאים בגרפים
 ```
 
 **נקודות טכניות מפורטות:**
 
-- **הפרדה בין בניית גרף לרישום גרף היא בחירה מכוונת.** `register` הוא חוזה: כל גרף שנוצר חייב לעבור דרכו כדי להופיע (1) ב-`FIGS` — dict שממנו ההרכבה של ה-HTML שולפת את הגרפים ב-JSON, (2) inline במחברת עצמה למי שרץ אותה ב-Jupyter (למטרת debug). המנגנון מונע מצב שבו גרף נבנה אך "נשכח" ולא מחובר לדאשבורד.
-- **מה `_clean` עושה בפועל?** הרוב של Plotly ה-default מציג רשתות (gridlines) מרובעות, כותרות ממוקמות שמאל, וריצוד קטן ברקע. מבחינה אסתטית, זה נראה עמוס. `_clean` מסיר את כל הגרידים והרקעים, מציב את הכותרות במרכז, קובע פונט מערכתי (מונע התנגשות עם פונטי הדאשבורד). זו החלטה אסתטית שגורמת לגרפים להיראות אחידים על פני הטאבים.
+- **`FIGS` הוא dict מרכזי.** הגרפים נכתבים לתוכו ישירות בתא של Young Generation (למשל `FIGS["fig-young-digital"] = fig`). אין פונקציית עטיפה — עבור שני גרפים בלבד, השורה הישירה קצרה יותר ופחות מעורפלת.
+- **מה `_clean` עושה בפועל?** ברירת המחדל של Plotly מציגה רשתות (gridlines) מרובעות, כותרות ממוקמות שמאל, וריצוד ברקע. `_clean` מסיר את כל הגרידים והרקעים, מציב את הכותרות במרכז, וקובע פונט אחיד. זו החלטה אסתטית שגורמת לגרפים להיראות אחידים על פני הטאבים.
+- **`age_order`** — משמש ב-`reindex` בתא הבא כדי לשמור על סדר גילאים כרונולוגי במקום מיון אלפביתי של pandas.
 
 ---
 
@@ -222,8 +203,8 @@ age_order = [AGE_LABELS[k] for k in sorted(AGE_LABELS)]
 
 **נקודות טכניות:**
 
-- הטאב Young Generation מכיל גם **סימולטור ריבית דריבית אינטראקטיבי**, שהלוגיקה שלו יושבת בקוד ה-JavaScript של תא 10. הסימולטור מציג שהפקדה של 500 ש"ח בחודש בין גיל 25 לגיל 67 בריבית 6% מגיעה לכ-1.1 מיליון ש"ח בסוף התקופה.
-- **`_clean(fig)`** מוחל על כל גרף לפני `register`, כדי לשמור על אחידות ויזואלית.
+- הטאב Young Generation מכיל גם **סימולטור ריבית דריבית אינטראקטיבי**, שהלוגיקה שלו יושבת בקוד ה-JavaScript של תא 10. הסימולטור מציג שהפקדה של 500 ש"ח בחודש בין גיל 25 לגיל 67 בריבית 6% מגיעה לכ-1.21 מיליון ש"ח בסוף התקופה.
+- **`_clean(fig)`** מוחל על כל גרף לפני הכנסתו ל-`FIGS`. אחריו: `fig.show()` להצגה inline במחברת, ואז `FIGS["fig-young-digital"] = fig`.
 
 ---
 
@@ -416,20 +397,18 @@ def _lookup_label(_var, _code):
 - את המפה שהתא של Folium בנה (`MAP_SRCDOC`).
 - את השאלון (`QUIZ`) כמחרוזת JSON.
 
-**מנגנון ה-Template:** התא בונה את `HTML_TEMPLATE` כמחרוזת Python רגילה עם placeholders — `__PLOTLYJS__`, `__FIGS__`, `__QUIZ__`, `__MAP_SRCDOC__`, `__OVERVIEW__`, `__DATA_QUALITY__`, `__DESCRIPTIVES__`, `__MODEL_PERF__`, `__MODEL_INTERP__`. בסוף התא, שרשרת של `.replace(...)` מחליפה כל placeholder בערך הרלוונטי.
+**מנגנון ה-Template:** התא בונה את `HTML_TEMPLATE` כמחרוזת Python רגילה עם placeholders — `__FIGS__`, `__QUIZ__`, `__MAP_SRCDOC__`, `__OVERVIEW__`, `__DATA_QUALITY__`, `__DESCRIPTIVES__`, `__MODEL_PERF__`, `__MODEL_INTERP__`. בסוף התא, שרשרת של `.replace(...)` מחליפה כל placeholder בערך הרלוונטי. Plotly.js נטען מ-CDN בתוך תגית `<script src=...>` בתוך התבנית עצמה, ולא מוטמע פנימה.
 
 **קטע קוד מלא — שרשרת ההחלפה:**
 
 ```python
 def js_safe(s):
-    """מנטרל '</script>' בתוך JSON strings שמוטמעים בתוך <script> block."""
+    """Neutralize '</script>' inside JSON strings embedded in a <script> block."""
     return s.replace("</script>", "<\\/script>").replace("</Script>", "<\\/Script>")
 
-# figs_payload = כל הגרפים של Plotly, כל אחד ב-JSON נפרד
 figs_payload = {name: json.loads(fig.to_json()) for name, fig in FIGS.items()}
 
 html = (HTML_TEMPLATE
-        .replace("__PLOTLYJS__", get_plotlyjs())        # ~3.5 MB
         .replace("__OVERVIEW__", OVERVIEW_HTML)
         .replace("__FIGS__", js_safe(json.dumps(figs_payload)))
         .replace("__QUIZ__", js_safe(json.dumps(QUIZ)))
@@ -442,6 +421,8 @@ html = (HTML_TEMPLATE
 with open("index.html", "w", encoding="utf-8") as f:
     f.write(html)
 ```
+
+**Plotly.js מגיע מ-CDN:** תגית `<script src="https://cdn.plot.ly/plotly-2.35.2.min.js">` בתבנית ה-HTML. הגודל הסופי של `index.html` הוא כ-2 MB במקום 5.5 MB שהיה כשספריית Plotly הוטמעה בפנים.
 
 **נקודה חשובה על `js_safe`:** מלכודת ידועה ב-HTML embedding של JSON.
 
@@ -777,27 +758,22 @@ function backToQuiz() {
 **קטע קוד:**
 
 ```python
-import http.server
-import socketserver
-import threading
+import http.server, socketserver, threading
 
-class _QuietHandler(http.server.SimpleHTTPRequestHandler):
-    def log_message(self, *args):
-        pass    # אין הדפסות של HTTP requests בכל בקשה
-
-def start_local_server(preferred_port=8890, tries=20):
-    for p in range(preferred_port, preferred_port + tries):
+def start_local_server(port=8890, tries=5):
+    for p in range(port, port + tries):
         try:
-            httpd = socketserver.TCPServer(("127.0.0.1", p), _QuietHandler)
-            t = threading.Thread(target=httpd.serve_forever, daemon=True)
-            t.start()
+            httpd = socketserver.TCPServer(
+                ("127.0.0.1", p),
+                http.server.SimpleHTTPRequestHandler,
+            )
+            threading.Thread(target=httpd.serve_forever, daemon=True).start()
             return httpd, p
         except OSError:
-            continue      # פורט תפוס - נסה את הבא
+            continue
     return None, None
 
 if IN_COLAB:
-    print(f"Dashboard ready: {OUT_HTML}")
     from google.colab import files
     files.download(OUT_HTML)
 else:
@@ -809,9 +785,9 @@ else:
 
 **נקודות טכניות מפורטות:**
 
-- **הצורך בשרת מקומי — Same-Origin Policy.** כשפותחים קובץ HTML ישירות דרך `file://c:/...`, הדפדפן מפעיל מדיניות הרבה יותר מגבילה. `iframe srcdoc` לפעמים לא נטען כי הדפדפן חושב שזה attempt לגשת ל-URL מסוגים שונים. פונטים מוטמעים ב-CSS לפעמים נחסמים. `http://127.0.0.1` הוא origin רגיל שהדפדפן מטפל בו כמו כל אתר, וכל התכונות עובדות. בנוסף — סביבת GitHub Pages תמיד תגיש דרך `https://`, אז יש היגיון לפתח דרך `http://` שיותר קרוב.
-- **`daemon=True` על ה-thread.** ב-Python, thread ברירת מחדל הוא לא daemon — כלומר, כשהמחברת נסגרת, הפעם שהיא מתנהלת עם הפלט של הlog של השרת, לא מוציאה תהליכי zombie. `daemon=True` דואג לזה: כש-Python המרכזי (הprocess של Jupyter kernel) נסגר, כל daemon threads נסגרים איתו.
-- **פתרון קונפליקטי פורטים.** אם פורט 8890 תפוס (למשל, ריצה קודמת של המחברת שלא נסגרה כמו שצריך), הלולאה מנסה 8891, 8892, וכן הלאה עד 8909. אחרי 20 ניסיונות מוותרים ומודיעים.
+- **הצורך בשרת מקומי — Same-Origin Policy.** כשפותחים קובץ HTML ישירות דרך `file://c:/...`, הדפדפן מפעיל מדיניות אבטחה יותר מגבילה. `iframe srcdoc` לפעמים לא נטען. `http://127.0.0.1` הוא origin רגיל שהדפדפן מטפל בו כמו כל אתר, וכל התכונות עובדות. בנוסף — סביבת GitHub Pages תמיד תגיש דרך `https://`, אז יש היגיון לפתח דרך `http://` שיותר קרוב.
+- **`daemon=True` על ה-thread.** ב-Python, thread ברירת מחדל הוא לא daemon. `daemon=True` דואג לכך שכשהמחברת נסגרת, השרת נסגר איתו ולא נשאר תהליך רץ.
+- **חמישה ניסיונות פורט.** אם 8890 תפוס, מנסים 8891 עד 8894. אם כל אחד תפוס — עוזבים.
 
 ---
 
